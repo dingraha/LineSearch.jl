@@ -80,7 +80,6 @@ end
 @testitem "LineSearches.jl: Newton Raphson" tags = [:linesearchesjl] setup = [RootFinding] begin
     using LineSearches, SciMLBase
     using ADTypes, Tracker, ForwardDiff, Zygote, ReverseDiff, FiniteDiff
-    using StaticArraysCore: SVector
 
     @testset "OOP Problem" begin
         nlf(x, p) = x .^ 2 .- p
@@ -133,6 +132,7 @@ end
 @testitem "Native Line Search: Newton Raphson" tags = [:core] setup = [RootFinding] begin
     using SciMLBase
     using ADTypes, Tracker, ForwardDiff, Zygote, ReverseDiff, FiniteDiff
+    using StaticArraysCore: SVector
 
     @testset "OOP Problem" begin
         nlf(x, p) = x .^ 2 .- p

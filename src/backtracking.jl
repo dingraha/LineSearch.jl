@@ -71,7 +71,7 @@ end
 function CommonSolve.init(
         prob::AbstractNonlinearProblem, alg::BackTracking,
         fu::Union{SArray, Number}, u::Union{SArray, Number};
-        stats::Union{SciMLBase.NLStats, Nothing} = nothing, kwargs...
+        stats::Union{SciMLBase.NLStats, Nothing} = nothing, autodiff = nothing, kwargs...
     )
     if stats === nothing
         T = promote_type(eltype(fu), eltype(u))
