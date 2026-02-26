@@ -55,7 +55,48 @@ end
     maxiters::Int
 end
 
+@concrete struct StaticBackTrackingCache <: AbstractLineSearchCache
+    f
+    p
+    c_1
+    ρ_hi
+    ρ_lo
+    order <: Union{Val{2}, Val{3}}
+    alpha
+    initial_alpha
+    deriv_op
+    maxiters::Int
+end
+
 function CommonSolve.init(
+        prob::AbstractNonlinearProblem, alg::BackTracking,
+        fu::Union{SArray, Number}, u::Union{SArray, Number};
+        stats::Union{SciMLBase.NLStats, Nothing} = nothing, kwargs...
+    )
+    if stats === nothing
+        T = promote_type(eltype(fu), eltype(u))
+
+        autodiff = autodiff !== nothing ? autodiff : alg.autodiff
+
+        _, _, deriv_op = construct_jvp_or_vjp_operator(prob, fu, u; autodiff)
+
+        u_norm = @fastmath norm(u, Inf)
+        alpha = min(alg.initial_alpha, alg.maxstep / u_norm)
+
+        return StaticBackTrackingCache(
+            prob.f, prob.p, T(alg.c_1), T(alg.ρ_hi), T(alg.ρ_lo), alg.order, T(alpha), T(alg.initial_alpha), deriv_op, alg.maxiters
+        )
+    end
+    return generic_backtracking_init(prob, alg, fu, u; stats, kwargs...)
+end
+
+function CommonSolve.init(
+        prob::AbstractNonlinearProblem, alg::BackTracking, fu, u; kwargs...
+    )
+    return generic_backtracking_init(prob, alg, fu, u; kwargs...)
+end
+
+function generic_backtracking_init(
         prob::AbstractNonlinearProblem, alg::BackTracking, fu, u;
         stats::Union{SciMLBase.NLStats, Nothing} = nothing, autodiff = nothing, kwargs...
     )
@@ -67,6 +108,7 @@ function CommonSolve.init(
     @bb u_cache = similar(u)
     @bb fu_cache = similar(fu)
 
+    # This only closes over `stats`.
     ϕ = @closure (
         f, p, u, du, α, u_cache,
         fu_cache,
@@ -77,6 +119,7 @@ function CommonSolve.init(
         return @fastmath norm(fu_cache)^2 / 2
     end
 
+    # This only closes over `stats`.
     ϕdϕ = @closure (
         f, p, u, du, α, u_cache, fu_cache,
         deriv_op,
@@ -93,8 +136,7 @@ function CommonSolve.init(
     alpha = min(alg.initial_alpha, alg.maxstep / u_norm)
 
     return BackTrackingCache(
-        prob.f, prob.p, ϕ, ϕdϕ, T(alpha), T(alg.initial_alpha), deriv_op,
-        u_cache, fu_cache, stats, alg, alg.maxiters
+        prob.f, prob.p, ϕ, ϕdϕ, T(alpha), T(alg.initial_alpha), deriv_op, u_cache, fu_cache, stats, alg, alg.maxiters
     )
 end
 
@@ -137,6 +179,61 @@ function CommonSolve.solve!(cache::BackTrackingCache, u, du)
         α₂ = max(α_tmp, α₂ * T(cache.alg.ρ_lo))
 
         ϕx₀, ϕx₁ = ϕx₁, ϕ(α₂)
+    end
+
+    return LineSearchSolution(α₂, ReturnCode.Failure)
+end
+
+@inline function _static_φ(f, p, u, du, α)
+    u_cache = u + α * du
+    fu = f(u_cache, p)
+    return @fastmath norm(fu)^2 / 2
+end
+
+@inline function _static_φdφ(f, p, u, du, α, deriv_op)
+    u_cache = u + α * du
+    fu = f(u_cache, p)
+    deriv = deriv_op(du, u_cache, fu, p)
+    obj = @fastmath norm(fu)^2 / 2
+    return obj, deriv
+end
+
+function CommonSolve.solve!(cache::StaticBackTrackingCache, u, du)
+    T = promote_type(eltype(du), eltype(u))
+    return LineSearchSolution(zero(T), ReturnCode.Failure)
+
+    ϕ₀, dϕ₀ = _static_φdφ(cache.f, cache.p, u, du, zero(T), cache.deriv_op)
+    α₁, α₂ = cache.alpha, cache.alpha
+    ϕx₀, ϕx₁ = ϕ₀, _static_φ(cache.f, cache.p, u, du, α₁)
+
+    finite_maxiters = -log2(eps(real(T)))
+    iteration = 1
+    while !isfinite(ϕx₁) && iteration ≤ finite_maxiters
+        α₁ = α₂
+        α₂ = α₁ / 2
+        ϕx₁ = _static_φ(cache.f, cache.p, u, du, α₂)
+        iteration += 1
+    end
+
+    ϕx₁ ≤ ϕ₀ + T(cache.c_1) * α₂ * dϕ₀ &&
+        return LineSearchSolution(α₂, ReturnCode.Success)
+    α_tmp = -(dϕ₀ * α₂^2) / (2 * (ϕx₁ - ϕ₀ - dϕ₀ * α₂))
+    α₁ = α₂
+    α_tmp = min(α_tmp, α₂ * T(cache.ρ_hi))
+    α₂ = max(α_tmp, α₂ * T(cache.ρ_lo))
+    ϕx₀, ϕx₁ = ϕx₁, _static_φ(cache.f, cache.p, u, du, α₂)
+
+    for _ in (iteration + 1):(cache.maxiters)
+        ϕx₁ ≤ ϕ₀ + T(cache.c_1) * α₂ * dϕ₀ &&
+            return LineSearchSolution(α₂, ReturnCode.Success)
+
+        α_tmp = compute_alpha_backtracking(cache.order, T, dϕ₀, ϕ₀, ϕx₀, ϕx₁, α₁, α₂)
+
+        α₁ = α₂
+        α_tmp = min(α_tmp, α₂ * T(cache.ρ_hi))
+        α₂ = max(α_tmp, α₂ * T(cache.ρ_lo))
+
+        ϕx₀, ϕx₁ = ϕx₁, _static_φ(cache.f, cache.p, u, du, α₂)
     end
 
     return LineSearchSolution(α₂, ReturnCode.Failure)
