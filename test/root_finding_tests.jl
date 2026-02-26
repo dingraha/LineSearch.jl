@@ -5,6 +5,7 @@
 
 using SciMLBase, DifferentiationInterface, ForwardDiff
 using SciMLBase: AbstractNonlinearProblem
+using MaybeInplace: @bb
 const DI = DifferentiationInterface
 
 function newton_raphson(prob::AbstractNonlinearProblem, ls)
@@ -20,6 +21,7 @@ function newton_raphson_oop(prob::AbstractNonlinearProblem, ls)
     fu = prob.f(u, prob.p)
 
     ls_cache = init(prob, ls, fu, u)
+    @show typeof(ls_cache)
 
     alphas = Float64[]
     iter = 0
@@ -34,7 +36,7 @@ function newton_raphson_oop(prob::AbstractNonlinearProblem, ls)
         ls_sol = solve!(ls_cache, u, δu)
 
         push!(alphas, ls_sol.step_size)
-        @. u = u + ls_sol.step_size * δu
+        @bb @. u = u + ls_sol.step_size * δu
 
         fu = prob.f(u, prob.p)
     end
@@ -82,9 +84,7 @@ end
 
     @testset "OOP Problem" begin
         nlf(x, p) = x .^ 2 .- p
-        x0 = SVector{2,Float64}(-1.0, 1.0)
-        params = 3.0
-        nlp = NonlinearProblem(nlf, x0, params)
+        nlp = NonlinearProblem(nlf, [-1.0, 1.0], [3.0])
 
         @testset for autodiff in (
                 AutoTracker(), AutoForwardDiff(), AutoZygote(),
@@ -136,7 +136,9 @@ end
 
     @testset "OOP Problem" begin
         nlf(x, p) = x .^ 2 .- p
-        nlp = NonlinearProblem(nlf, [-1.0, 1.0], [3.0])
+        x0 = SVector{2,Float64}(-1.0, 1.0)
+        params = 3.0
+        nlp = NonlinearProblem(nlf, x0, params)
 
         @testset "method: $(nameof(typeof(method)))" for method in (
                 LiFukushimaLineSearch(),
