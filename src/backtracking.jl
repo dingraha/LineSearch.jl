@@ -200,7 +200,6 @@ end
 
 function CommonSolve.solve!(cache::StaticBackTrackingCache, u, du)
     T = promote_type(eltype(du), eltype(u))
-    return LineSearchSolution(zero(T), ReturnCode.Failure)
 
     ϕ₀, dϕ₀ = _static_φdφ(cache.f, cache.p, u, du, zero(T), cache.deriv_op)
     α₁, α₂ = cache.alpha, cache.alpha

@@ -21,7 +21,6 @@ function newton_raphson_oop(prob::AbstractNonlinearProblem, ls)
     fu = prob.f(u, prob.p)
 
     ls_cache = init(prob, ls, fu, u)
-    @show typeof(ls_cache)
 
     alphas = Float64[]
     iter = 0
@@ -133,12 +132,11 @@ end
     using SciMLBase
     using ADTypes, Tracker, ForwardDiff, Zygote, ReverseDiff, FiniteDiff
     using StaticArraysCore: SVector
+    using DifferentiationInterface
 
     @testset "OOP Problem" begin
         nlf(x, p) = x .^ 2 .- p
-        x0 = SVector{2,Float64}(-1.0, 1.0)
-        params = 3.0
-        nlp = NonlinearProblem(nlf, x0, params)
+        nlp = NonlinearProblem(nlf, [-1.0, 1.0], [3.0])
 
         @testset "method: $(nameof(typeof(method)))" for method in (
                 LiFukushimaLineSearch(),
@@ -153,6 +151,29 @@ end
         @testset for autodiff in (
                 AutoTracker(), AutoForwardDiff(), AutoZygote(),
                 AutoReverseDiff(), AutoFiniteDiff(),
+            )
+            @testset "method: $(nameof(typeof(method)))" for method in (
+                    BackTracking(; order = Val(3), autodiff),
+                    BackTracking(; order = Val(2), autodiff),
+                )
+                converged, fu, u, iter, alphas = newton_raphson(nlp, method)
+
+                @test fu ≈ [0.0, 0.0] atol = 1.0e-3
+                @test abs.(u) ≈ sqrt.([3.0, 3.0]) atol = 1.0e-3
+            end
+        end
+
+    end
+
+    @testset "OOP Problem, static" begin
+        nlf(x, p) = x .^ 2 .- p
+        x0 = SVector{2,Float64}(-1.0, 1.0)
+        params = 3.0
+        nlp = NonlinearProblem(nlf, x0, params)
+        @testset for autodiff in (
+                AutoForwardDiff(), AutoZygote(),
+                AutoReverseDiff(), AutoFiniteDiff(),
+                DifferentiationInterface.AutoForwardFromPrimitive(AutoForwardDiff()),
             )
             @testset "method: $(nameof(typeof(method)))" for method in (
                     BackTracking(; order = Val(3), autodiff),
