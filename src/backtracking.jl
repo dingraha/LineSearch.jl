@@ -108,7 +108,6 @@ function generic_backtracking_init(
     @bb u_cache = similar(u)
     @bb fu_cache = similar(fu)
 
-    # This only closes over `stats`.
     ϕ = @closure (
         f, p, u, du, α, u_cache,
         fu_cache,
@@ -119,7 +118,6 @@ function generic_backtracking_init(
         return @fastmath norm(fu_cache)^2 / 2
     end
 
-    # This only closes over `stats`.
     ϕdϕ = @closure (
         f, p, u, du, α, u_cache, fu_cache,
         deriv_op,
@@ -136,7 +134,8 @@ function generic_backtracking_init(
     alpha = min(alg.initial_alpha, alg.maxstep / u_norm)
 
     return BackTrackingCache(
-        prob.f, prob.p, ϕ, ϕdϕ, T(alpha), T(alg.initial_alpha), deriv_op, u_cache, fu_cache, stats, alg, alg.maxiters
+        prob.f, prob.p, ϕ, ϕdϕ, T(alpha), T(alg.initial_alpha), deriv_op,
+        u_cache, fu_cache, stats, alg, alg.maxiters
     )
 end
 

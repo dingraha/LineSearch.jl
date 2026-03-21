@@ -69,7 +69,7 @@ function newton_raphson_oop_no_alphas(prob::AbstractNonlinearProblem, ls)
     return false, fu, u, iter
 end
 
-function newton_raphson_with_allocs(prob::AbstractNonlinearProblem, ls)
+function newton_raphson_track_allocs(prob::AbstractNonlinearProblem, ls)
     converged, fu, u, iter = newton_raphson_oop_no_alphas(prob, ls)
     allocs = @allocated newton_raphson_oop_no_alphas(prob, ls)
     return converged, fu, u, iter, allocs
@@ -104,7 +104,7 @@ function newton_raphson_iip(prob::AbstractNonlinearProblem, ls)
     return false, fu, u, iter, alphas
 end
 
-export newton_raphson, newton_raphson_with_allocs
+export newton_raphson, newton_raphson_track_allocs
 
 end
 
@@ -216,7 +216,12 @@ end
                 @test fu ≈ [0.0, 0.0] atol = 1.0e-3
                 @test abs.(u) ≈ sqrt.([3.0, 3.0]) atol = 1.0e-3
 
-                converged, fu, u, iter, allocs = newton_raphson_with_allocs(nlp, method)
+                converged, fu, u, iter, allocs = newton_raphson_track_allocs(nlp, method)
+                println("$(autodiff), $(nameof(typeof(method))): allocs = $(allocs)")
+                @test allocs == 0
+                # if autodiff in (AutoForwardDiff(), AutoFiniteDiff())
+                #     @test allocs == 0
+                # end
                 @test fu ≈ [0.0, 0.0] atol = 1.0e-3
                 @test abs.(u) ≈ sqrt.([3.0, 3.0]) atol = 1.0e-3
             end
