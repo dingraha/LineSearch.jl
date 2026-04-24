@@ -173,6 +173,7 @@ end
         @testset "method: $(nameof(typeof(method)))" for method in (
                 LiFukushimaLineSearch(),
                 NoLineSearch(0.5),
+                GoldenSection(; tol = 1.0e-4),
                 RobustNonMonotoneLineSearch(),
                 RobustNonMonotoneLineSearch(; M = 1), #strictly monotonous case
                 RobustNonMonotoneLineSearch(; M = 15),
@@ -238,6 +239,7 @@ end
         @testset "method: $(nameof(typeof(method)))" for method in (
                 LiFukushimaLineSearch(),
                 NoLineSearch(0.5),
+                GoldenSection(; tol = 1.0e-4),
                 RobustNonMonotoneLineSearch(),
                 RobustNonMonotoneLineSearch(; M = 1), #strictly monotonous case
                 RobustNonMonotoneLineSearch(; M = 15),
