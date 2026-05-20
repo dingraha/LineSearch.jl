@@ -44,7 +44,7 @@ SciMLJacobianOperators = "0.1.13"
 StaticArraysCore = "1.4"
 Test = "1.10"
 Tracker = "0.2.35"
-Zygote = "0.6.71"
+Zygote = "0.6.71, 0.7"
 julia = "1.10"
 
 [extras]

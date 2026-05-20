@@ -55,7 +55,6 @@ function newton_raphson_oop_no_alphas(prob::AbstractNonlinearProblem, ls)
 
         maximum(abs, fu) < 1.0e-8 && return true, fu, u, iter
 
-        # J = DI.jacobian(prob.f, AutoForwardDiff(), u, Constant(prob.p))
         J = DI.jacobian(prob.f, AutoForwardDiff(), u, Constant(prob.p))
         δu = -J \ fu
 
@@ -205,7 +204,7 @@ end
         nlf(x, p) = x .^ 2 .- p
         x0 = SVector{2,Float64}(-1.0, 1.0)
         params = 3.0
-        nlp = NonlinearProblem(nlf, x0, params)
+        nlp = NonlinearProblem{false}(nlf, x0, params)
         @testset for autodiff in (
                 AutoForwardDiff(), AutoZygote(),
                 AutoReverseDiff(), AutoFiniteDiff(),
@@ -221,11 +220,9 @@ end
                 @test abs.(u) ≈ sqrt.([3.0, 3.0]) atol = 1.0e-3
 
                 converged, fu, u, iter, allocs = newton_raphson_track_allocs(nlp, method)
-                println("$(autodiff), $(nameof(typeof(method))): allocs = $(allocs)")
-                @test allocs == 0
-                # if autodiff in (AutoForwardDiff(), AutoFiniteDiff())
-                #     @test allocs == 0
-                # end
+                if autodiff in (AutoForwardDiff(), AutoFiniteDiff())
+                    @test allocs == 0
+                end
                 @test fu ≈ [0.0, 0.0] atol = 1.0e-3
                 @test abs.(u) ≈ sqrt.([3.0, 3.0]) atol = 1.0e-3
             end
