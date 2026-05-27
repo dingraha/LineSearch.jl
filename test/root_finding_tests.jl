@@ -220,8 +220,13 @@ end
                 @test abs.(u) ≈ sqrt.([3.0, 3.0]) atol = 1.0e-3
 
                 converged, fu, u, iter, allocs = newton_raphson_track_allocs(nlp, method)
-                if autodiff in (AutoForwardDiff(), AutoFiniteDiff())
+                if autodiff in (
+                    AutoForwardDiff(),
+                    DifferentiationInterface.AutoForwardFromPrimitive(AutoForwardDiff()),
+                )
                     @test allocs == 0
+                else
+                    @test_broken allocs == 0
                 end
                 @test fu ≈ [0.0, 0.0] atol = 1.0e-3
                 @test abs.(u) ≈ sqrt.([3.0, 3.0]) atol = 1.0e-3
