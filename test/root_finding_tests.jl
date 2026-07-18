@@ -223,6 +223,7 @@ end
                 if autodiff in (
                     AutoForwardDiff(),
                     DifferentiationInterface.AutoForwardFromPrimitive(AutoForwardDiff()),
+                    AutoFiniteDiff(),
                 )
                     @test allocs == 0
                 else
